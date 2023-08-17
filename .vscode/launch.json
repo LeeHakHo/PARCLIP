@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "parclip",
+            "type": "python",
+            "request": "launch",
+            "program": "train.py",
+            "args": ["+experiment=parclip",
+            "dataset=eng","charset=36_lowercase",
+            ]
+        }
+    ]
+}
+
