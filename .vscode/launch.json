@@ -6,7 +6,12 @@
             "type": "python",
             "request": "launch",
             "program": "train.py",
-            "args": ["+experiment=parclip",
+            "console": "integratedTerminal",
+            "env": {
+                "CUDA_VISIBLE_DEVICE":"0,1,2,3,4,5,6,7",
+                "NCCL_P2P_DISABLE":"1"
+            },
+            "args": ["+experiment=parclip", 
             "dataset=eng","charset=36_lowercase",
             ]
         }

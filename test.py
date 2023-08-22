@@ -204,12 +204,12 @@ def main():
         charset_test += string.punctuation
     kwargs.update({'charset_test': charset_test})
     print(f'Additional keyword arguments: {kwargs}')
+
     model = load_from_checkpoint(args.checkpoint, **kwargs).eval().to(args.device)
     hp = model.hparams
 
     datamodule = SceneTextDataModule(args.data_root, '_unused_', hp.img_size, hp.max_label_length, hp.charset_train,
                                      hp.charset_test, args.batch_size, args.num_workers, False, rotation=args.rotation)
-
 
     # Leehakho
     if args.data == "chinese":

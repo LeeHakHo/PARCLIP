@@ -34,7 +34,12 @@ from .modules import DecoderLayer, Decoder, Encoder, TokenEmbedding
 from .CLIP import clip,model,simple_tokenizer
 import torch
 
+import matplotlib.pyplot as plt
+import random
 device = "cuda" if torch.cuda.is_available() else "cpu"
+
+#Leehakho
+padding = False
 
 class PARCLIP(CrossEntropySystem):
 
@@ -79,32 +84,38 @@ class PARCLIP(CrossEntropySystem):
         for param in self.CLIPmodel.parameters():
             param.requires_grad = False
 
-        # self.encoder = Encoder(img_size, patch_size, embed_dim=embed_dim, depth=enc_depth, num_heads=enc_num_heads,
-        #                        mlp_ratio=enc_mlp_ratio)
-        #self.encoder = self.CLIPmodel.visual
-
-        # self.label = ["black", "photo", "transform", "text", "shape", "tel", "锦素杜康", "chinese", "勇政的厨子", "岁潮童馆", "afasdvbas",
-        #          "asgwqrf", "비즈니스class", "비즈니스", "class",
-        #          "해리the찬", "the", "해리", "korean", "english", "百年好舍tel", "百年好舍", "te百年好舍l", "tel百年好舍", "형사소송실무", "ocdl",
-        #          "odlc", "clod", "bafsvdaas", "abasdf"]
-
         self.charset_train = charset_train
-
-        dic = simple_tokenizer.SimpleTokenizer(max_label_length= self.max_label_length, charset = self.charset_train)
-        self.label = dic.getLabelVocab()
-        self.label = self.label[:7000]
-        print(len(self.label))
-
-        #self.label = self.label[:6000]
-
-        self.text_token = torch.cat([clip.tokenize(f"word {c}") for c in self.label]).to(self._device)
 
         self.encoder = Encoder(img_size, patch_size, embed_dim=embed_dim, depth=enc_depth, num_heads=enc_num_heads,
                                mlp_ratio=enc_mlp_ratio)
 
-        self.new = True
-        self.text_features =None
+        dic = simple_tokenizer.SimpleTokenizer(max_label_length= self.max_label_length, charset = self.charset_train)
+        self.label_origin = dic.getLabelVocab()
 
+        self.new = True
+
+        self.load_features = False
+
+        if self.load_features:
+            self.new = False
+            # 파일에서 텐서를 불러오기
+            features = torch.load('text_features_6000.pth').to(self._device)
+            number = ["12000", "18000", "24000", "30000", "36000", "42000","48000","54000","60000","66000","72000","78000","84000","87837"]
+            for num in number:
+                temp = torch.load('text_features_' + num + '.pth').to(self._device)
+                features = torch.cat((features, temp), axis=0)
+            print(features.shape)
+            self.text_features = features
+            self.label = self.label_origin
+        else:
+            if padding:
+                self.label = self.label_origin[:1]
+                
+            self.label = random.sample(self.label_origin, 6000)
+            #self.label = self.label_origin
+            print(len(self.label))
+            self.text_token = torch.cat([clip.tokenize(f"word {c}") for c in self.label]).to(self._device)
+            
     @torch.jit.ignore
     def no_weight_decay(self):
         param_names = {'text_embed.embedding.weight', 'pos_queries'}
@@ -133,18 +144,20 @@ class PARCLIP(CrossEntropySystem):
         with torch.no_grad():
             emb = self.CLIPmodel.encode_text(text)
         return emb
-
+    
     def decode(self, tgt: torch.Tensor, x: torch.Tensor, memory: torch.Tensor, tgt_mask: Optional[Tensor] = None,
                tgt_padding_mask: Optional[Tensor] = None, tgt_query: Optional[Tensor] = None,
                tgt_query_mask: Optional[Tensor] = None):
+        if self.load_features:
+            self.text_features = self.text_features.to(self._device)
+            self.text_features /= self.text_features.norm(dim=-1, keepdim=True).to(self._device)
 
+        else:
+            if self.new:
+                self.text_features = self.txtencode(self.text_token.to(self._device))
+                self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
+                self.new = False
 
-        if self.new:
-            self.text_features = self.txtencode(self.text_token.to(self._device))
-            self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
-            self.new = False
-
-        #print(text_features.shape)
         tgt_list = []
         for image_features in x:
             image_features /= image_features.norm(dim=-1, keepdim=True)
@@ -158,9 +171,12 @@ class PARCLIP(CrossEntropySystem):
             tgt = self.label[indices]
             #print("index:", indices, " clip pred:", tgt)
             #tgt = self.tokenizer.encode(tgt, self._device)
-            #print(tgt.shape)
-            tgt_list.append(tgt)
 
+            #Leehakho
+            if padding:
+                tgt = ""
+
+            tgt_list.append(tgt)
             #tgt_emb.append(txt_emb[indices])
 
         tgt = self.tokenizer.encode(tgt_list, self._device)

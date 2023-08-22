@@ -6,7 +6,7 @@ model:
   max_label_length: 25
   charset_train: 0123456789abcdefghijklmnopqrstuvwxyz
   charset_test: 0123456789abcdefghijklmnopqrstuvwxyz
-  batch_size: 64
+  batch_size: 384
   weight_decay: 0.0
   warmup_pct: 0.075
   name: parclip
@@ -44,7 +44,7 @@ data:
 trainer:
   _target_: pytorch_lightning.Trainer
   _convert_: all
-  val_check_interval: 2000
+  val_check_interval: 1000
   max_epochs: 300
   gradient_clip_val: 20
   accelerator: gpu

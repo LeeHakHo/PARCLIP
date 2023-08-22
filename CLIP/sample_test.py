@@ -8,6 +8,14 @@ import torchvision
 from torchvision import transforms
 from PIL import Image
 import string
+import random
+import numpy as np
+
+seed = 2023
+random.seed(seed)
+np.random.seed(seed)
+torch.manual_seed(seed)
+torch.cuda.manual_seed_all(seed)
 
 # Load the model
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -64,21 +72,22 @@ label = ["black", "photo", "transform", "text", "shape", "tel", "锦素杜康", 
 #label = string.digits + string.ascii_lowercase# + string.ascii_uppercase
 #label = ["comfortable place "]
 
-img = Image.open("/home/ohh/PycharmProject/CLIP-main/sample/asgwqrf.png")
-image_input = preprocess(img).unsqueeze(0).to(device)
+#img = Image.open("/home/ohh/PycharmProject/CLIP-main/sample/asgwqrf.png")
+#image_input = preprocess(img).unsqueeze(0).to(device)
 text_inputs = torch.cat([clip.tokenize(f"word {c}")for c in label]).to(device)
-#text_inputs = torch.cat([clip.tokenize(f"a photo containing the letter {c}")for c in label]).to(device)
+text_inputs = torch.cat([clip.tokenize(f"a photo containing the letter {c}")for c in label]).to(device)
 
 
-images_path = ["/home/ohh/PycharmProject/CLIP-main/sample/cafe.png", "/home/ohh/PycharmProject/CLIP-main/sample/cafe_a.png","/home/ohh/PycharmProject/CLIP-main/sample/cafe_b.png", "/home/ohh/PycharmProject/CLIP-main/sample/cafe_c.png"]
-images = images_to_tensor(images_path)
+#images_path = ["/home/ohh/PycharmProject/CLIP-main/sample/cafe.png", "/home/ohh/PycharmProject/CLIP-main/sample/cafe_a.png","/home/ohh/PycharmProject/CLIP-main/sample/cafe_b.png", "/home/ohh/PycharmProject/CLIP-main/sample/cafe_c.png"]
+#images = images_to_tensor(images_path)
 
 # Calculate features
 with torch.no_grad():
-    image_features = model.encode_image(image_input)
+    #image_features = model.encode_image(image_input)
     text_features = model.encode_text(text_inputs)
-    sim = model(image=images, text=text_inputs)
-
+    print(text_features[0])
+    #sim = model(image=images, text=text_inputs)
+sim = 0
 scalar_list = []
 for tensor in sim[0]:
     for value in tensor:

@@ -32,6 +32,10 @@ from strhub.data.utils import CharsetAdapter, CTCTokenizer, Tokenizer, BaseToken
 
 from torchvision.utils import save_image
 
+
+#Leehakho
+onlyclip = False #clip만 가지고 실험 결과 보기
+
 @dataclass
 class BatchResult:
     num_samples: int
@@ -54,6 +58,12 @@ class BaseSystem(pl.LightningModule, ABC):
         self.lr = lr
         self.warmup_pct = warmup_pct
         self.weight_decay = weight_decay
+
+
+        #Leehakho
+        if onlyclip:
+            from strhub.models.parclip.only_CLIP import only_clip
+            self.only_clip = only_clip()
 
     @abstractmethod
     def forward(self, images: Tensor, max_length: Optional[int] = None) -> Tensor:
@@ -118,11 +128,24 @@ class BaseSystem(pl.LightningModule, ABC):
 
         probs = logits.softmax(-1)
         preds, probs = self.tokenizer.decode(probs)
+
+
+
+        #Leehakho
+        if onlyclip:
+            preds = self.only_clip.forward(images)
+
+
         for pred, prob, gt in zip(preds, probs, labels):
+
             confidence += prob.prod().item()
             pred = self.charset_adapter(pred)
             # Follow ICDAR 2019 definition of N.E.D.
             ned += edit_distance(pred, gt) / max(len(pred), len(gt))
+            
+            #Leehakho
+            #write_unique_strings_to_file(gt)
+
             if pred == gt:
                 correct += 1
                 # try:
@@ -221,3 +244,19 @@ class CTCSystem(BaseSystem):
         target_lengths = torch.as_tensor(list(map(len, labels)), dtype=torch.long, device=self.device)
         loss = F.ctc_loss(log_probs, targets, input_lengths, target_lengths, blank=self.blank_id, zero_infinity=True)
         return logits, loss, N
+
+#Leehakho
+def write_unique_strings_to_file(string):
+    file_path = "/home/ohh/PycharmProject/PARCLIP/test_GT.txt"
+
+    try:
+        # 기존 파일에서 이미 있는 문자열 읽어오기
+        with open(file_path, 'r') as file:
+            existing_strings = set(file.read().splitlines())
+    except FileNotFoundError:
+        existing_strings = set()
+
+    # 중복 체크 후 문자열 저장
+    if string not in existing_strings:
+        with open(file_path, 'a') as file:
+            file.write(string + '\n')
