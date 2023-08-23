@@ -38,9 +38,6 @@ import matplotlib.pyplot as plt
 import random
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-#Leehakho
-padding = False
-
 class PARCLIP(CrossEntropySystem):
 
     def __init__(self, charset_train: str, charset_test: str, max_label_length: int,
@@ -91,10 +88,14 @@ class PARCLIP(CrossEntropySystem):
 
         dic = simple_tokenizer.SimpleTokenizer(max_label_length= self.max_label_length, charset = self.charset_train)
         self.label_origin = dic.getLabelVocab()
+        
 
         self.new = True
-
+        #Leehakho
+        self.padding = False
         self.load_features = False
+        self.use_gt = True
+
 
         if self.load_features:
             self.new = False
@@ -108,9 +109,9 @@ class PARCLIP(CrossEntropySystem):
             self.text_features = features
             self.label = self.label_origin
         else:
-            if padding:
+            if self.padding:
                 self.label = self.label_origin[:1]
-                
+                    
             self.label = random.sample(self.label_origin, 6000)
             #self.label = self.label_origin
             print(len(self.label))
@@ -147,37 +148,41 @@ class PARCLIP(CrossEntropySystem):
     
     def decode(self, tgt: torch.Tensor, x: torch.Tensor, memory: torch.Tensor, tgt_mask: Optional[Tensor] = None,
                tgt_padding_mask: Optional[Tensor] = None, tgt_query: Optional[Tensor] = None,
-               tgt_query_mask: Optional[Tensor] = None):
-        if self.load_features:
-            self.text_features = self.text_features.to(self._device)
-            self.text_features /= self.text_features.norm(dim=-1, keepdim=True).to(self._device)
+               tgt_query_mask: Optional[Tensor] = None, GT: Optional[Tensor] = None):
 
+        if GT is None:
+            if self.load_features:
+                self.text_features = self.text_features.to(self._device)
+                self.text_features /= self.text_features.norm(dim=-1, keepdim=True).to(self._device)
+
+            else:
+                if self.new:
+                    self.text_features = self.txtencode(self.text_token.to(self._device))
+                    self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
+                    self.new = False
+
+            tgt_list = []
+            for image_features in x:
+                image_features /= image_features.norm(dim=-1, keepdim=True)
+                #print(image_features.shape)
+                similarity = (100.0 * image_features @ self.text_features.T).softmax(dim=-1)
+                #print(similarity[0])
+                values, indices = similarity.topk(1)
+
+                #for value, index in zip(values, indices):
+                #print(indices)
+                tgt = self.label[indices]
+                #print("index:", indices, " clip pred:", tgt)
+                #tgt = self.tokenizer.encode(tgt, self._device)
+
+                #Leehakho
+                if self.padding:
+                    tgt = ""
+
+                tgt_list.append(tgt)
+                #tgt_emb.append(txt_emb[indices])
         else:
-            if self.new:
-                self.text_features = self.txtencode(self.text_token.to(self._device))
-                self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
-                self.new = False
-
-        tgt_list = []
-        for image_features in x:
-            image_features /= image_features.norm(dim=-1, keepdim=True)
-            #print(image_features.shape)
-            similarity = (100.0 * image_features @ self.text_features.T).softmax(dim=-1)
-            #print(similarity[0])
-            values, indices = similarity.topk(1)
-
-            #for value, index in zip(values, indices):
-            #print(indices)
-            tgt = self.label[indices]
-            #print("index:", indices, " clip pred:", tgt)
-            #tgt = self.tokenizer.encode(tgt, self._device)
-
-            #Leehakho
-            if padding:
-                tgt = ""
-
-            tgt_list.append(tgt)
-            #tgt_emb.append(txt_emb[indices])
+            tgt_list = GT
 
         tgt = self.tokenizer.encode(tgt_list, self._device)
         tgt = tgt[:, :-1]
@@ -253,26 +258,40 @@ class PARCLIP(CrossEntropySystem):
         n = (gt != self.pad_id).sum().item()
         max_len = tgt.shape[1] -2 # exclude <eos> from count
 
-        out = self.forward(images, max_len)
-        # max_length = max_len
-        # max_length = self.max_label_length if max_length is None else min(max_length, self.max_label_length)
-        # bs = images.shape[0]
-        # # +1 for <eos> at end of sequence.
-        # num_steps = max_length + 1
-        # x, _ = self.clip_encode(images)
-        # memory = self.encode(images)
-        #
-        # # Query positions up to `num_steps`
-        # pos_queries = self.pos_queries[:, :num_steps].expand(bs, -1, -1)
-        #
-        # # Special case for the forward permutation. Faster than using `generate_attn_masks()`
-        # # tgt_mask = query_mask = torch.triu(torch.full((num_steps, num_steps), float('-inf'), device=self._device), 1)
-        #
-        # # No prior context, so input is just <bos>. We query all positions.
-        # tgt_in = torch.full((bs, 1), self.bos_id, dtype=torch.long, device=self._device)
-        # tgt_out = self.decode(tgt_in, x, memory, tgt_query=pos_queries)
-        # # print(tgt_out.shape) #1,6,384
-        # out = self.head(tgt_out)
+
+
+
+
+        #out = self.forward(images, max_len)
+        #forward 부분
+        max_length = max_len
+        max_length = self.max_label_length if max_length is None else min(max_length, self.max_label_length)
+        bs = images.shape[0]
+        # +1 for <eos> at end of sequence.
+        num_steps = max_length + 1
+        x, _ = self.clip_encode(images)
+        memory = self.encode(images)
+
+        # Query positions up to `num_steps`
+        pos_queries = self.pos_queries[:, :num_steps].expand(bs, -1, -1)
+
+        # Special case for the forward permutation. Faster than using `generate_attn_masks()`
+        #tgt_mask = query_mask = torch.triu(torch.full((num_steps, num_steps), float('-inf'), device=self._device), 1)
+
+        # No prior context, so input is just <bos>. We query all positions.
+        tgt_in = torch.full((bs, 1), self.bos_id, dtype=torch.long, device=self._device)
+        if self.use_gt:
+            tgt_out = self.decode(tgt_in, x, memory, tgt_query=pos_queries, GT=labels)
+        else:
+            tgt_out = self.decode(tgt_in, x, memory, tgt_query=pos_queries)
+        #print(tgt_out.shape) #torch.Size([64, 26, 384])
+        logits = self.head(tgt_out)
+        #print(logits.shape, "!!!!") #1, 6, 37 same
+        #loss = F.cross_entropy(logits, logits, ignore_index=self.pad_id)
+        out = logits
+
+
+
 
 
         #print(out.shape, gt.shape)
