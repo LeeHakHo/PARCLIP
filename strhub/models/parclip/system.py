@@ -94,9 +94,10 @@ class PARCLIP(CrossEntropySystem):
         #Leehakho
         self.padding = False
         self.load_features = False
-        self.use_gt = True
+        self.use_gt = False
+        self.seperate = False
 
-
+        self.label = self.label_origin
         if self.load_features:
             self.new = False
             # 파일에서 텐서를 불러오기
@@ -107,15 +108,21 @@ class PARCLIP(CrossEntropySystem):
                 features = torch.cat((features, temp), axis=0)
             print(features.shape)
             self.text_features = features
-            self.label = self.label_origin
         else:
-            if self.padding:
-                self.label = self.label_origin[:1]
-                    
-            self.label = random.sample(self.label_origin, 6000)
-            #self.label = self.label_origin
-            print(len(self.label))
-            self.text_token = torch.cat([clip.tokenize(f"word {c}") for c in self.label]).to(self._device)
+            if self.seperate:
+                self.text_token = []
+                for l in self.label:
+                    a = []
+                    a.append(l)
+                    self.text_token.append(torch.cat([clip.tokenize(f"word {c}") for c in a]).to(self._device))
+            else:
+                self.label = random.sample(self.label_origin, 100)
+                print(len(self.label))
+
+                if self.padding:
+                    self.label = self.label_origin[:1]
+
+                self.text_token = torch.cat([clip.tokenize(f"word {c}") for c in self.label])
             
     @torch.jit.ignore
     def no_weight_decay(self):
@@ -143,21 +150,32 @@ class PARCLIP(CrossEntropySystem):
 
         #print(self.CLIPpreprocess(img))
         with torch.no_grad():
-            emb = self.CLIPmodel.encode_text(text)
+            emb = self.CLIPmodel.encode_text(text.to(self._device))
         return emb
     
     def decode(self, tgt: torch.Tensor, x: torch.Tensor, memory: torch.Tensor, tgt_mask: Optional[Tensor] = None,
                tgt_padding_mask: Optional[Tensor] = None, tgt_query: Optional[Tensor] = None,
                tgt_query_mask: Optional[Tensor] = None, GT: Optional[Tensor] = None):
 
-        if GT is None:
+
+        if GT is not None:
+            tgt_list = GT
+        else:
             if self.load_features:
-                self.text_features = self.text_features.to(self._device)
-                self.text_features /= self.text_features.norm(dim=-1, keepdim=True).to(self._device)
+                if self.new:
+                    self.text_features = self.text_features.to(self._device)
+                    self.text_features /= self.text_features.norm(dim=-1, keepdim=True).to(self._device)
+                    self.new = False
+
+            elif self.seperate:
+                if self.new:
+                    self.text_features = torch.cat([self.txtencode(c) for c in self.text_token]).to(self._device)
+                    self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
+                    self.new = False
 
             else:
                 if self.new:
-                    self.text_features = self.txtencode(self.text_token.to(self._device))
+                    self.text_features = self.txtencode(self.text_token).to(self._device)
                     self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
                     self.new = False
 
@@ -181,8 +199,7 @@ class PARCLIP(CrossEntropySystem):
 
                 tgt_list.append(tgt)
                 #tgt_emb.append(txt_emb[indices])
-        else:
-            tgt_list = GT
+
 
         tgt = self.tokenizer.encode(tgt_list, self._device)
         tgt = tgt[:, :-1]
@@ -209,6 +226,7 @@ class PARCLIP(CrossEntropySystem):
         max_length = self.max_label_length if max_length is None else min(max_length, self.max_label_length)
         bs = images.shape[0]
         # +1 for <eos> at end of sequence.
+
         num_steps = max_length + 1
         x, _ = self.clip_encode(images)
         memory = self.encode(images)
