@@ -46,6 +46,8 @@ class DecoderLayer(nn.Module):
         self.dropout2 = nn.Dropout(dropout)
         self.dropout3 = nn.Dropout(dropout)
 
+        self.my_linear = nn.Linear(512,768)
+
         self.activation = transformer._get_activation_fn(activation)
 
     def __setstate__(self, state):
@@ -85,6 +87,7 @@ class DecoderLayer(nn.Module):
     def forward(self, query, content, memory, query_mask: Optional[Tensor] = None, content_mask: Optional[Tensor] = None,
                 content_key_padding_mask: Optional[Tensor] = None, update_content: bool = True):
         query_norm = self.norm_q(query)
+        content = self.my_linear(content)
         content_norm = self.norm_c(content)
         #print(query.shape, query_norm.shape, self.norm1(query).shape) #torch.Size([64, 26, 384]) torch.Size([64, 26, 384]) torch.Size([64, 26, 384])
         query = self.forward_stream(query, query_norm, content_norm, memory, query_mask, content_key_padding_mask)[0]

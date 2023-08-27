@@ -93,7 +93,7 @@ class PARCLIP(CrossEntropySystem):
         self.new = True
         #Leehakho
         self.padding = False
-        self.load_features = False
+        self.load_features = True
         self.use_gt = False
         self.seperate = False
 
@@ -108,6 +108,7 @@ class PARCLIP(CrossEntropySystem):
                 features = torch.cat((features, temp), axis=0)
             print(features.shape)
             self.text_features = features
+            self.tm = self.text_features
         else:
             if self.seperate:
                 self.text_token = []
@@ -116,7 +117,7 @@ class PARCLIP(CrossEntropySystem):
                     a.append(l)
                     self.text_token.append(torch.cat([clip.tokenize(f"word {c}") for c in a]).to(self._device))
             else:
-                self.label = random.sample(self.label_origin, 100)
+                self.label = random.sample(self.label_origin, 18000)
                 print(len(self.label))
 
                 if self.padding:
@@ -163,63 +164,57 @@ class PARCLIP(CrossEntropySystem):
         else:
             if self.load_features:
                 if self.new:
-                    self.text_features = self.text_features.to(self._device)
                     self.text_features /= self.text_features.norm(dim=-1, keepdim=True).to(self._device)
                     self.new = False
 
             elif self.seperate:
                 if self.new:
                     self.text_features = torch.cat([self.txtencode(c) for c in self.text_token]).to(self._device)
-                    self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
+                    self.tm = self.text_features
+                    self.text_features /= self.text_features.norm(dim=-1, keepdim=True).to(self._device)
                     self.new = False
 
             else:
                 if self.new:
                     self.text_features = self.txtencode(self.text_token).to(self._device)
+                    self.tm = self.text_features
                     self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
                     self.new = False
 
             tgt_list = []
+            tf = []
             for image_features in x:
                 image_features /= image_features.norm(dim=-1, keepdim=True)
                 #print(image_features.shape)
-                similarity = (100.0 * image_features @ self.text_features.T).softmax(dim=-1)
+                similarity = (100.0 * image_features.to(self._device) @ self.text_features.T.to(self._device)).softmax(dim=-1).to(self._device)
                 #print(similarity[0])
                 values, indices = similarity.topk(1)
 
                 #for value, index in zip(values, indices):
                 #print(indices)
-                tgt = self.label[indices]
                 #print("index:", indices, " clip pred:", tgt)
                 #tgt = self.tokenizer.encode(tgt, self._device)
 
-                #Leehakho
-                if self.padding:
-                    tgt = ""
 
-                tgt_list.append(tgt)
+                tf.append(self.tm[indices])
                 #tgt_emb.append(txt_emb[indices])
 
-
-        tgt = self.tokenizer.encode(tgt_list, self._device)
-        tgt = tgt[:, :-1]
+        tf = torch.cat(tf, dim=0).to(self._device)
+        # tgt = self.tokenizer.encode(tgt_list, self._device)
+        # tgt = tgt[:, :-1]
         #print(tgt.shape) #64,11
         #tgt = torch.stack(tgt_list)
         #tgt = tgt.squeeze(0)
         #B, N, L = tgt.shape
-        N, L = tgt.shape
+        N, L = tf.shape
         #print(L)
         # <bos> stands for the null context. We only supply position information for characters after <bos>.
-        null_ctx = self.text_embed(tgt[:, :1])
 
-        tgt_emb = self.pos_queries[:, :L - 1] + self.text_embed(tgt[:, 1:])
-
-        tgt_emb = self.dropout(torch.cat([null_ctx, tgt_emb], dim=1))
         if tgt_query is None:
             tgt_query = self.pos_queries[:, :L].expand(N, -1, -1)
             #print(tgt_query.shape, L, N) #torch.Size([64, 10, 384]) 10 64
         tgt_query = self.dropout(tgt_query)
-        return self.decoder(tgt_query, tgt_emb, memory, tgt_query_mask, tgt_mask, tgt_padding_mask)
+        return self.decoder(tgt_query, tf, memory, tgt_query_mask, tgt_mask, tgt_padding_mask)
 
     def forward(self, images: Tensor, max_length: Optional[int] = None) -> Tensor:
         #print(images.shape, max_length)
@@ -228,8 +223,8 @@ class PARCLIP(CrossEntropySystem):
         # +1 for <eos> at end of sequence.
 
         num_steps = max_length + 1
-        x, _ = self.clip_encode(images)
-        memory = self.encode(images)
+        x, memory = self.clip_encode(images)
+        #memory = self.encode(images)
 
         # Query positions up to `num_steps`
         pos_queries = self.pos_queries[:, :num_steps].expand(bs, -1, -1)
@@ -287,8 +282,8 @@ class PARCLIP(CrossEntropySystem):
         bs = images.shape[0]
         # +1 for <eos> at end of sequence.
         num_steps = max_length + 1
-        x, _ = self.clip_encode(images)
-        memory = self.encode(images)
+        x, memory = self.clip_encode(images)
+        #memory = self.encode(images)
 
         # Query positions up to `num_steps`
         pos_queries = self.pos_queries[:, :num_steps].expand(bs, -1, -1)
