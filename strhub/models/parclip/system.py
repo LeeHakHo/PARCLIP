@@ -59,14 +59,14 @@ class PARCLIP(CrossEntropySystem):
 
         # Perm/attn mask stuff
         self.rng = np.random.default_rng()
-        self.max_gen_perms = perm_num // 2 if perm_mirrored else perm_num
-        self.perm_forward = perm_forward
-        self.perm_mirrored = perm_mirrored
+        #self.max_gen_perms = perm_num // 2 if perm_mirrored else perm_num
+        #self.perm_forward = perm_forward
+        #self.perm_mirrored = perm_mirrored
         self.embed_dim = embed_dim
         # We don't predict <bos> nor <pad>
         self.head = nn.Linear(embed_dim, len(self.tokenizer) - 2)
         #print( len(self.tokenizer) - 2) #37
-        self.text_embed = TokenEmbedding(len(self.tokenizer), embed_dim)
+        #self.text_embed = TokenEmbedding(len(self.tokenizer), embed_dim)
 
         # +1 for <eos>
         self.pos_queries = nn.Parameter(torch.Tensor(1, max_label_length + 1, embed_dim))
@@ -76,15 +76,14 @@ class PARCLIP(CrossEntropySystem):
         nn.init.trunc_normal_(self.pos_queries, std=.02)
 
         self.CLIPmodel, self.CLIPpreprocess = clip.load('ViT-B/16')
-
         # 모델 파라미터 고정하기
         for param in self.CLIPmodel.parameters():
             param.requires_grad = False
 
         self.charset_train = charset_train
 
-        self.encoder = Encoder(img_size, patch_size, embed_dim=embed_dim, depth=enc_depth, num_heads=enc_num_heads,
-                               mlp_ratio=enc_mlp_ratio)
+        # self.encoder = Encoder(img_size, patch_size, embed_dim=embed_dim, depth=enc_depth, num_heads=enc_num_heads,
+        #                        mlp_ratio=enc_mlp_ratio)
 
         dic = simple_tokenizer.SimpleTokenizer(max_label_length= self.max_label_length, charset = self.charset_train)
         self.label_origin = dic.getLabelVocab()
@@ -101,12 +100,12 @@ class PARCLIP(CrossEntropySystem):
         if self.load_features:
             self.new = False
             # 파일에서 텐서를 불러오기
-            features = torch.load('text_features_6000.pth').to(self._device)
-            number = ["12000", "18000", "24000", "30000", "36000", "42000","48000","54000","60000","66000","72000","78000","84000","87837"]
+            features = torch.load('text_features_new_30000.pth').to(self._device)
+            number = ["60000", "87837"]
             for num in number:
-                temp = torch.load('text_features_' + num + '.pth').to(self._device)
+                temp = torch.load('text_features_new_' + num + '.pth').to(self._device)
                 features = torch.cat((features, temp), axis=0)
-            print(features.shape)
+            #print(features.shape)
             self.text_features = features
             self.tm = self.text_features
         else:
@@ -123,24 +122,27 @@ class PARCLIP(CrossEntropySystem):
                 if self.padding:
                     self.label = self.label_origin[:1]
 
-                self.text_token = torch.cat([clip.tokenize(f"word {c}") for c in self.label])
-            
+                self.text_token = torch.cat([clip.tokenize(f"word {c}") for c in self.label]).to(self._device)
+                #print(self.text_token.shape)
+    
+        #self.my_linear1 = nn.Linear(512,self.embed_dim)
+        #self.my_linear2 = nn.Linear(512,self.embed_dim)
     @torch.jit.ignore
     def no_weight_decay(self):
         param_names = {'text_embed.embedding.weight', 'pos_queries'}
-        enc_param_names = {'encoder.' + n for n in self.encoder.no_weight_decay()}
-        return param_names.union(enc_param_names)
+        #enc_param_names = {'encoder.' + n for n in self.encoder.no_weight_decay()}
+        return param_names#.union(enc_param_names)
 
     def clip_encode(self, img: torch.Tensor):
         #print(img.shape)
         img = F.interpolate(img, size=224)
         #print(img.shape)
         #img = F.interpolate(img.unsqueeze(0), size=(3,224,224), mode='bilinear', align_corners=False)
-        #print(self.CLIPpreprocess(img))
+        #print(img.shape) #torch.Size([768, 3, 32, 128])
         with torch.no_grad():
             #emb = self.CLIPmodel.visual(img)
             #print(img.shape)
-            emb = self.CLIPmodel.visual(img.type(self.CLIPmodel.dtype))
+            emb = self.CLIPmodel.encode_image(img)
         return emb
         #return self.encoder(img)
 
@@ -149,12 +151,12 @@ class PARCLIP(CrossEntropySystem):
 
     def txtencode(self, text: torch.Tensor):
 
-        #print(self.CLIPpreprocess(img))
+        #print(text.shape)
         with torch.no_grad():
             emb = self.CLIPmodel.encode_text(text.to(self._device))
         return emb
     
-    def decode(self, tgt: torch.Tensor, x: torch.Tensor, memory: torch.Tensor, tgt_mask: Optional[Tensor] = None,
+    def decode(self, x: torch.Tensor, memory: torch.Tensor, tgt_mask: Optional[Tensor] = None,
                tgt_padding_mask: Optional[Tensor] = None, tgt_query: Optional[Tensor] = None,
                tgt_query_mask: Optional[Tensor] = None, GT: Optional[Tensor] = None):
 
@@ -176,9 +178,9 @@ class PARCLIP(CrossEntropySystem):
 
             else:
                 if self.new:
-                    self.text_features = self.txtencode(self.text_token).to(self._device)
+                    self.text_features = self.txtencode(self.text_token)
                     self.tm = self.text_features
-                    self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
+                    self.text_features /= self.text_features.norm(dim=-1, keepdim=True).to(self._device)
                     self.new = False
 
             tgt_list = []
@@ -195,24 +197,25 @@ class PARCLIP(CrossEntropySystem):
                 #print("index:", indices, " clip pred:", tgt)
                 #tgt = self.tokenizer.encode(tgt, self._device)
 
-
                 tf.append(self.tm[indices])
                 #tgt_emb.append(txt_emb[indices])
 
         tf = torch.cat(tf, dim=0).to(self._device)
+        #tf = self.my_linear1(tf)
         # tgt = self.tokenizer.encode(tgt_list, self._device)
         # tgt = tgt[:, :-1]
         #print(tgt.shape) #64,11
         #tgt = torch.stack(tgt_list)
         #tgt = tgt.squeeze(0)
         #B, N, L = tgt.shape
-        N, L = tf.shape
+        #N, L = tf.shape
+        
         #print(L)
         # <bos> stands for the null context. We only supply position information for characters after <bos>.
 
-        if tgt_query is None:
-            tgt_query = self.pos_queries[:, :L].expand(N, -1, -1)
-            #print(tgt_query.shape, L, N) #torch.Size([64, 10, 384]) 10 64
+        #if tgt_query is None:
+        #    tgt_query = self.pos_queries[:, :L].expand(N, -1, -1)
+        #    #print(tgt_query.shape, L, N) #torch.Size([64, 10, 384]) 10 64
         tgt_query = self.dropout(tgt_query)
         return self.decoder(tgt_query, tf, memory, tgt_query_mask, tgt_mask, tgt_padding_mask)
 
@@ -224,6 +227,8 @@ class PARCLIP(CrossEntropySystem):
 
         num_steps = max_length + 1
         x, memory = self.clip_encode(images)
+        #print(x.shape, memory.shape) #torch.Size([768, 512]) torch.Size([768, 197, 768])
+
         #memory = self.encode(images)
 
         # Query positions up to `num_steps`
@@ -232,9 +237,7 @@ class PARCLIP(CrossEntropySystem):
         # Special case for the forward permutation. Faster than using `generate_attn_masks()`
         #tgt_mask = query_mask = torch.triu(torch.full((num_steps, num_steps), float('-inf'), device=self._device), 1)
 
-        # No prior context, so input is just <bos>. We query all positions.
-        tgt_in = torch.full((bs, 1), self.bos_id, dtype=torch.long, device=self._device)
-        tgt_out = self.decode(tgt_in, x, memory,tgt_query=pos_queries)
+        tgt_out = self.decode(x, memory,tgt_query=pos_queries)
         #print(tgt_out.shape) #torch.Size([64, 26, 384])
         logits = self.head(tgt_out)
         #print(logits.shape, "!!!!") #1, 6, 37 same
@@ -283,6 +286,8 @@ class PARCLIP(CrossEntropySystem):
         # +1 for <eos> at end of sequence.
         num_steps = max_length + 1
         x, memory = self.clip_encode(images)
+        #memory = self.my_linear2(memory)
+        
         #memory = self.encode(images)
 
         # Query positions up to `num_steps`
@@ -291,12 +296,10 @@ class PARCLIP(CrossEntropySystem):
         # Special case for the forward permutation. Faster than using `generate_attn_masks()`
         #tgt_mask = query_mask = torch.triu(torch.full((num_steps, num_steps), float('-inf'), device=self._device), 1)
 
-        # No prior context, so input is just <bos>. We query all positions.
-        tgt_in = torch.full((bs, 1), self.bos_id, dtype=torch.long, device=self._device)
         if self.use_gt:
-            tgt_out = self.decode(tgt_in, x, memory, tgt_query=pos_queries, GT=labels)
+            tgt_out = self.decode(x, memory, tgt_query=pos_queries, GT=labels)
         else:
-            tgt_out = self.decode(tgt_in, x, memory, tgt_query=pos_queries)
+            tgt_out = self.decode(x, memory, tgt_query=pos_queries)
         #print(tgt_out.shape) #torch.Size([64, 26, 384])
         logits = self.head(tgt_out)
         #print(logits.shape, "!!!!") #1, 6, 37 same

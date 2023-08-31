@@ -209,7 +209,6 @@ class VisionTransformer(nn.Module):
         self.input_resolution = input_resolution
         self.output_dim = output_dim
         self.conv1 = nn.Conv2d(in_channels=3, out_channels=width, kernel_size=patch_size, stride=patch_size, bias=False)
-
         scale = width ** -0.5
         self.class_embedding = nn.Parameter(scale * torch.randn(width))
         self.positional_embedding = nn.Parameter(scale * torch.randn((input_resolution // patch_size) ** 2 + 1, width))
@@ -226,7 +225,9 @@ class VisionTransformer(nn.Module):
     #     return {'pos_embed', 'cls_token', 'dist_token'}
 
     def forward(self, x: torch.Tensor):
+        #print(x.shape) #768,3,112,112
         x = self.conv1(x)  # shape = [*, width, grid, grid]
+        #print(x.shape) #768,768,7,7
         x = x.reshape(x.shape[0], x.shape[1], -1)  # shape = [*, width, grid ** 2]
         x = x.permute(0, 2, 1)  # shape = [*, grid ** 2, width]
         x = torch.cat([self.class_embedding.to(x.dtype) + torch.zeros(x.shape[0], 1, x.shape[-1], dtype=x.dtype, device=x.device), x], dim=1)  # shape = [*, grid ** 2 + 1, width]

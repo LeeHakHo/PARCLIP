@@ -21,8 +21,9 @@ from torch.utils.data import DataLoader
 from torchvision import transforms as T
 
 from .dataset import build_tree_dataset, LmdbDataset
+from CLIP import clip
 
-
+useCLIP = True
 class SceneTextDataModule(pl.LightningDataModule):
     TEST_BENCHMARK_SUB = ('IIIT5k', 'SVT', 'IC13_857', 'IC15_1811', 'SVTP', 'CUTE80')
     TEST_BENCHMARK = ('IIIT5k', 'SVT', 'IC13_1015', 'IC15_2077', 'SVTP', 'CUTE80')
@@ -65,6 +66,17 @@ class SceneTextDataModule(pl.LightningDataModule):
 
     @staticmethod
     def get_transform(img_size: Tuple[int], augment: bool = False, rotation: int = 0):
+        if useCLIP:
+            _, CLIPpreprocess = clip.load('ViT-B/16')
+
+            if augment:
+                from .augment import rand_augment_transform
+                CLIPpreprocess.transforms.insert(0, rand_augment_transform())
+            if rotation:
+                CLIPpreprocess.transforms.insert(0,(lambda img: img.rotate(rotation, expand=True)))
+
+
+            return CLIPpreprocess
         transforms = []
         if augment:
             from .augment import rand_augment_transform
