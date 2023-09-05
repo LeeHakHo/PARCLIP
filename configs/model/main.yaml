@@ -6,14 +6,14 @@ defaults:
 
 model:
   _convert_: all
-  img_size: [ 32, 128 ]  # [ height, width ]
+  img_size: [ 224, 224 ]  # [ height, width ]
   max_label_length: 25
   # The ordering in charset_train matters. It determines the token IDs assigned to each character.
   charset_train: "0123456789abcdefghijklmnopqrstuvwxyz"
 
   # For charset_test, ordering doesn't matter.
   charset_test: "0123456789abcdefghijklmnopqrstuvwxyz"
-  batch_size: 384
+  batch_size: 64
   weight_decay: 0.0
   warmup_pct: 0.075  # equivalent to 1.5 epochs of warm up
 
