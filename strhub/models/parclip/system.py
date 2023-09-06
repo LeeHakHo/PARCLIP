@@ -91,38 +91,38 @@ class PARCLIP(CrossEntropySystem):
 
         self.new = True
         #Leehakho
-        self.padding = False
-        self.load_features = False
-        self.use_gt = False
-        self.seperate = False
+        # self.padding = False
+        # self.load_features = False
+        # self.use_gt = False
+        # self.seperate = False
 
-        self.label = self.label_origin
-        if self.load_features:
-            self.new = False
-            # 파일에서 텐서를 불러오기
-            features = torch.load('text_features_new_30000.pth').to(self._device)
-            number = ["60000", "87837"]
-            for num in number:
-                temp = torch.load('text_features_new_' + num + '.pth').to(self._device)
-                features = torch.cat((features, temp), axis=0)
-            #print(features.shape)
-            self.text_features = features
-            self.tm = self.text_features
-        else:
-            if self.seperate:
-                self.text_token = []
-                for l in self.label:
-                    a = []
-                    a.append(l)
-                    self.text_token.append(torch.cat([clip.tokenize(f"word {c}") for c in a]).to(self._device))
-            else:
-                self.label = random.sample(self.label_origin, 3000)
-                print(len(self.label))
+        # self.label = self.label_origin
+        # if self.load_features:
+        #     self.new = False
+        #     # 파일에서 텐서를 불러오기
+        #     features = torch.load('text_features_new_30000.pth').to(self._device)
+        #     number = ["60000", "87837"]
+        #     for num in number:
+        #         temp = torch.load('text_features_new_' + num + '.pth').to(self._device)
+        #         features = torch.cat((features, temp), axis=0)
+        #     #print(features.shape)
+        #     self.text_features = features
+        #     self.tm = self.text_features
+        # else:
+        #     if self.seperate:
+        #         self.text_token = []
+        #         for l in self.label:
+        #             a = []
+        #             a.append(l)
+        #             self.text_token.append(torch.cat([clip.tokenize(f"word {c}") for c in a]).to(self._device))
+        #     else:
+        #         self.label = random.sample(self.label_origin, 3000)
+        #         #print(self.label)
 
-                if self.padding:
-                    self.label = self.label_origin[:1]
-
-                self.text_token = torch.cat([clip.tokenize(f"word {c}") for c in self.label]).to(self._device)
+        #         if self.padding:
+        #             self.label = self.label_origin[:1]
+                
+        #         self.text_token = torch.cat([clip.tokenize(f"word {c}") for c in self.label])
                 #print(self.text_token.shape)
     
         #self.my_linear1 = nn.Linear(512,self.embed_dim)
@@ -154,12 +154,12 @@ class PARCLIP(CrossEntropySystem):
 
         #print(text.shape)
         with torch.no_grad():
-            emb = self.CLIPmodel.encode_text(text)
+            emb = self.CLIPmodel.encode_text(text.to(self._device))
         return emb
     
     def decode(self, x: torch.Tensor, memory: torch.Tensor, tgt_mask: Optional[Tensor] = None,
                tgt_padding_mask: Optional[Tensor] = None, tgt_query: Optional[Tensor] = None,
-               tgt_query_mask: Optional[Tensor] = None, GT: Optional[Tensor] = None):
+               tgt_query_mask: Optional[Tensor] = None, max_len: Optional[int] = None, GT: Optional[Tensor] = None):
 
 
         if GT is not None:
@@ -179,9 +179,9 @@ class PARCLIP(CrossEntropySystem):
 
             else:
                 if self.new:
-                    token = self.text_token.to(self._device)
-                    self.text_features = self.txtencode(token)
-                    print("done!!!!!!!!!!!!!!")
+                    #self.text_token = self.text_token.to(self._device)
+                    
+                    self.text_features = self.txtencode(self.text_token)
                     self.tm = self.text_features[:][1]
                     self.text_features = self.text_features[:][0]
                     
@@ -223,7 +223,8 @@ class PARCLIP(CrossEntropySystem):
         #    #print(tgt_query.shape, L, N) #torch.Size([64, 10, 384]) 10 64
         #print(memory.shape)
         tgt_query = self.dropout(tgt_query)
-        return self.decoder(tgt_query, tf, x, tgt_query_mask, tgt_mask, tgt_padding_mask)
+        #print(x.shape, memory.shape)
+        return self.decoder(tgt_query, tf, memory, tgt_query_mask, tgt_mask, tgt_padding_mask)
 
     def forward(self, images: Tensor, max_length: Optional[int] = None) -> Tensor:
         #print(images.shape, max_length)
@@ -243,11 +244,15 @@ class PARCLIP(CrossEntropySystem):
         # Special case for the forward permutation. Faster than using `generate_attn_masks()`
         #tgt_mask = query_mask = torch.triu(torch.full((num_steps, num_steps), float('-inf'), device=self._device), 1)
 
-        tgt_out = self.decode(x, memory,tgt_query=pos_queries)
-        #print(tgt_out.shape) #torch.Size([64, 26, 384])
+        tgt_out = self.decode(x, memory,tgt_query=pos_queries, max_len = max_length)
+        #print(tgt_out.shape)  #torch.Size([32, 77, 512])
+        #print(tgt_out.shape)
+        # if max_length:
+        #     tgt_out = tgt_out[:, :max_length +1, :]
         logits = self.head(tgt_out)
         #print(logits.shape, "!!!!") #1, 6, 37 same
         #loss = F.cross_entropy(logits, logits, ignore_index=self.pad_id)
+
         return logits
 
     def write_unique_strings_to_file(self, strings):
@@ -307,6 +312,8 @@ class PARCLIP(CrossEntropySystem):
         else:
             tgt_out = self.decode(x, memory, tgt_query=pos_queries)
         #print(tgt_out.shape) #torch.Size([64, 26, 384])
+        if max_length:
+            tgt_out = tgt_out[:, :max_length +1, :]
         logits = self.head(tgt_out)
         #print(logits.shape, "!!!!") #1, 6, 37 same
         #loss = F.cross_entropy(logits, logits, ignore_index=self.pad_id)

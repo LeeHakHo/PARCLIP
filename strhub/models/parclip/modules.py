@@ -77,7 +77,9 @@ class DecoderLayer(nn.Module):
         # tgt = tgt + self.dropout1(tgt2)
 
         #print(tgt_norm.shape, memory.shape) #torch.Size([16, 11, 512]) torch.Size([16, 197, 768])
-        print(tgt_kv.shape, memory.shape) #torch.Size([16, 11, 512]) torch.Size([16, 197, 768])
+        #print(tgt_kv.shape, memory.shape) #torch.Size([32, 77, 512]) torch.Size([32, 197, 512])
+        #print(tgt_kv.shape, memory.shape) #torch.Size([16, 10, 384]) torch.Size([16, 1568, 384])
+
         tgt2, ca_weights = self.cross_attn(tgt_kv, memory, memory)#, attn_mask=tgt_mask, key_padding_mask=tgt_key_padding_mask)
         tgt = tgt + self.dropout2(tgt2)
         #print(tgt.shape)  # vs  torch.Size([1, 4, 384])

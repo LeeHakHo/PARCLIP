@@ -165,7 +165,6 @@ class PARSeq(CrossEntropySystem):
                 tgt_out = self.decode(tgt_in, memory, tgt_mask, tgt_padding_mask,
                                       tgt_query=pos_queries, tgt_query_mask=query_mask[:, :tgt_in.shape[1]])
                 logits = self.head(tgt_out)
-
         return logits
 
     def gen_tgt_perms(self, tgt):

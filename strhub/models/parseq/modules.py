@@ -65,7 +65,7 @@ class DecoderLayer(nn.Module):
         tgt2, sa_weights = self.self_attn(tgt_norm, tgt_kv, tgt_kv, attn_mask=tgt_mask,
                                           key_padding_mask=tgt_key_padding_mask)
         tgt = tgt + self.dropout1(tgt2)
-
+        #print((self.norm1(tgt)).shape, memory.shape) #torch.Size([16, 10, 384]) torch.Size([16, 1568, 384])
         tgt2, ca_weights = self.cross_attn(self.norm1(tgt), memory, memory)
         tgt = tgt + self.dropout2(tgt2)
 
