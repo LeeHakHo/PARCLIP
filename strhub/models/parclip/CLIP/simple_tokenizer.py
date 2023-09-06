@@ -81,18 +81,11 @@ class CharsetAdapter:
 
 class SimpleTokenizer(object):
     def __init__(self, bpe_path: str = default_bpe(), max_label_length: int = 25, charset: str = "abcdefghijklmnopqrstuvwxyz0123456789"):
-        self.charset_adapter = CharsetAdapter(charset)
         self.byte_encoder = bytes_to_unicode()
         self.byte_decoder = {v: k for k, v in self.byte_encoder.items()}
         self.max_label_length = max_label_length
-
-
         merges = gzip.open(bpe_path).read().decode("utf-8").split('\n')
-        gt = self.getLabelVocab()
-        merges = list(set(merges) | set(gt))
-        #merges = gt
-
-        #merges = merges[1:49152-256-2+1]
+        merges = merges[1:49152-256-2+1]
         merges = [tuple(merge.split()) for merge in merges]
         vocab = list(bytes_to_unicode().values())
         vocab = vocab + [v+'</w>' for v in vocab]
@@ -105,6 +98,7 @@ class SimpleTokenizer(object):
         self.bpe_ranks = dict(zip(merges, range(len(merges))))
         self.cache = {'<|startoftext|>': '<|startoftext|>', '<|endoftext|>': '<|endoftext|>'}
         self.pat = re.compile(r"""<\|startoftext\|>|<\|endoftext\|>|'s|'t|'re|'ve|'m|'ll|'d|[\p{L}]+|[\p{N}]|[^\s\p{L}\p{N}]+""", re.IGNORECASE)
+        self.charset_adapter = CharsetAdapter(charset)
 
 
     def preprocessing(self, vocab):
