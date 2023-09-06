@@ -247,8 +247,8 @@ class PARCLIP(CrossEntropySystem):
         tgt_out = self.decode(x, memory,tgt_query=pos_queries, max_len = max_length)
         #print(tgt_out.shape)  #torch.Size([32, 77, 512])
         #print(tgt_out.shape)
-        if max_length:
-            tgt_out = tgt_out[:, :max_length +1, :]
+        # if max_length:
+        #     tgt_out = tgt_out[:, :max_length +1, :]
         logits = self.head(tgt_out)
         #print(logits.shape, "!!!!") #1, 6, 37 same
         #loss = F.cross_entropy(logits, logits, ignore_index=self.pad_id)
@@ -312,8 +312,8 @@ class PARCLIP(CrossEntropySystem):
         else:
             tgt_out = self.decode(x, memory, tgt_query=pos_queries)
         #print(tgt_out.shape) #torch.Size([64, 26, 384])
-        if max_length:
-            tgt_out = tgt_out[:, :max_length +1, :]
+        # if max_length:
+        #     tgt_out = tgt_out[:, :max_length +1, :]
         logits = self.head(tgt_out)
         #print(logits.shape, "!!!!") #1, 6, 37 same
         #loss = F.cross_entropy(logits, logits, ignore_index=self.pad_id)

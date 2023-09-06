@@ -116,6 +116,12 @@ class Tokenizer(BaseTokenizer):
     def encode(self, labels: List[str], device: Optional[torch.device] = None) -> Tensor:
         batch = [torch.as_tensor([self.bos_id] + self._tok2ids(y) + [self.eos_id], dtype=torch.long, device=device)
                  for y in labels]
+        
+        #Leehakho
+        #batch[0] = torch.cat([batch[0], torch.zeros(78 - len(batch[0])).to(device)])
+        padding_length = 78 - batch[0].size(0)
+        padding = torch.full((padding_length,), self.pad_id, dtype=torch.long, device=device)
+        batch[0] = torch.cat([batch[0], padding])
         return pad_sequence(batch, batch_first=True, padding_value=self.pad_id)
 
     def _filter(self, probs: Tensor, ids: Tensor) -> Tuple[Tensor, List[int]]:
