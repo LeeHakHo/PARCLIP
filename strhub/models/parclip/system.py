@@ -94,7 +94,7 @@ class PARCLIP(CrossEntropySystem):
         self.padding = False
         self.load_features = False
         self.use_gt = False
-        self.seperate = False
+        self.seperate = True
 
         self.label = self.label_origin
         if self.load_features:
@@ -114,9 +114,11 @@ class PARCLIP(CrossEntropySystem):
                 for l in self.label:
                     a = []
                     a.append(l)
-                    self.text_token.append(torch.cat([clip.tokenize(f"word {c}") for c in a]).to(self._device))
+                    tt =torch.cat([clip.tokenize(f"word {c}") for c in a]).to(self._device)
+                    self.text_token.append(tt)
             else:
-                self.label = random.sample(self.label_origin, 3000)
+                #self.label = random.sample(self.label_origin, 3000)
+                self.label = self.label_origin
                 #print(self.label)
 
                 if self.padding:
@@ -172,8 +174,22 @@ class PARCLIP(CrossEntropySystem):
 
             elif self.seperate:
                 if self.new:
-                    self.text_features = torch.cat([self.txtencode(c) for c in self.text_token]).to(self._device)
-                    self.tm = self.text_features
+                    #self.text_features = torch.cat([self.txtencode(c) for c in self.text_token]).to(self._device)
+                    self.tm = []
+                    self.text_features =[]
+                    for c in self.text_token:
+                        temp = self.txtencode(c)
+                        self.tm.append(temp[1])
+                        self.text_features.append(temp[0])
+                        #print(self.tm[0].shape, self.text_features[0].shape)
+                    self.tm = torch.stack(self.tm)
+                    self.text_features = torch.stack(self.text_features)
+                    self.tm = self.tm.squeeze()
+                    self.text_features = self.text_features.squeeze()
+                    #print(self.tm.shape, self.text_features.shape)
+                    # self.text_features = torch.cat([self.txtencode(c)) for c in self.text_token])
+                    # self.tm = self.text_features[:][1]
+                    # self.text_features = self.text_features[:][0]
                     self.text_features /= self.text_features.norm(dim=-1, keepdim=True).to(self._device)
                     self.new = False
 
