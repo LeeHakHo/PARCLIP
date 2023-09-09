@@ -69,9 +69,9 @@ class DecoderLayer(nn.Module):
         # memory = memory.unsqueeze(0)
         #sa_weights = 0
 
-        tgt2, sa_weights = self.self_attn(tgt_norm, tgt_kv, tgt_kv, attn_mask=tgt_mask,
-                                        key_padding_mask=tgt_key_padding_mask)
-        tgt = tgt + self.dropout1(tgt2)
+        #tgt2, sa_weights = self.self_attn(tgt_norm, tgt_kv, tgt_kv, attn_mask=tgt_mask,
+        #                                key_padding_mask=tgt_key_padding_mask)
+        #tgt = tgt + self.dropout1(tgt2)
 
         #print(tgt_norm.shape, tgt_mask, tgt_key_padding_mask) #torch.Size([64, 26, 384]) None None
         tgt2, ca_weights = self.cross_attn(tgt_norm, memory, memory, attn_mask=tgt_mask, key_padding_mask=tgt_key_padding_mask)
@@ -80,7 +80,7 @@ class DecoderLayer(nn.Module):
         tgt2 = self.linear2(self.dropout(self.activation(self.linear1(self.norm2(tgt)))))
         tgt = tgt + self.dropout3(tgt2)
         #print(tgt.shape) # 1,2,384 vs 1, 6, 384
-        return tgt, sa_weights, ca_weights
+        return tgt, ca_weights
 
     def forward(self, query, content, memory, query_mask: Optional[Tensor] = None, content_mask: Optional[Tensor] = None,
                 content_key_padding_mask: Optional[Tensor] = None, update_content: bool = True):
