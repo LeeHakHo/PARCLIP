@@ -95,33 +95,41 @@ class PARCLIP(CrossEntropySystem):
         self.padding = False
         self.load_features = False
         self.use_gt = False
+        self.seperate = True
 
-
+        self.label = self.label_origin
         if self.load_features:
             self.new = False
             # 파일에서 텐서를 불러오기
-            features = torch.load('text_features_6000.pth').to(self._device)
-            number = ["12000", "18000", "24000", "30000", "36000", "42000","48000","54000","60000","66000","72000","78000","84000","87837"]
+            features = torch.load('text_features_new_30000.pth').to(self._device)
+            number = ["60000", "87837"]
             for num in number:
-                temp = torch.load('text_features_' + num + '.pth').to(self._device)
+                temp = torch.load('text_features_new_' + num + '.pth').to(self._device)
                 features = torch.cat((features, temp), axis=0)
-            print(features.shape)
+            #print(features.shape)
             self.text_features = features
-            self.label = self.label_origin
+            self.tm = self.text_features
         else:
-            if self.padding:
-                self.label = self.label_origin[:1]
-                    
-            self.label = random.sample(self.label_origin, 6000)
-            #self.label = self.label_origin
-            print(len(self.label))
-            self.text_token = torch.cat([clip.tokenize(f"word {c}") for c in self.label]).to(self._device)
-            
-    @torch.jit.ignore
-    def no_weight_decay(self):
-        param_names = {'text_embed.embedding.weight', 'pos_queries'}
-        enc_param_names = {'encoder.' + n for n in self.encoder.no_weight_decay()}
-        return param_names.union(enc_param_names)
+            if self.seperate:
+                self.text_token =[]
+                for l in self.label:
+                    a = []
+                    a.append(l)
+                    self.text_token.append(torch.cat([clip.tokenize(f"word {c}") for c in a]).to(self._device))
+            else:
+                self.label = random.sample(self.label_origin, 3000)
+                #self.label = self.label_origin
+                #print(self.label)
+
+                if self.padding:
+                    self.label = self.label_origin[:1]
+                
+                self.text_token = torch.cat([clip.tokenize(f"word {c}") for c in self.label])
+    #@torch.jit.ignore
+    #def no_weight_decay(self):
+    #    param_names = {'text_embed.embedding.weight', 'pos_queries'}
+    #    enc_param_names = {'encoder.' + n for n in self.encoder.no_weight_decay()}
+    #    return param_names.union(enc_param_names)
 
     def clip_encode(self, img: torch.Tensor):
         #print(img.shape)
@@ -143,46 +151,57 @@ class PARCLIP(CrossEntropySystem):
 
         #print(self.CLIPpreprocess(img))
         with torch.no_grad():
-            emb = self.CLIPmodel.encode_text(text)
+            emb = self.CLIPmodel.encode_text(text.to(self._device))
         return emb
     
     def decode(self, tgt: torch.Tensor, x: torch.Tensor, memory: torch.Tensor, tgt_mask: Optional[Tensor] = None,
                tgt_padding_mask: Optional[Tensor] = None, tgt_query: Optional[Tensor] = None,
                tgt_query_mask: Optional[Tensor] = None, GT: Optional[Tensor] = None):
 
-        if GT is None:
+        if GT is not None:
+            tgt_list = GT
+        else:
             if self.load_features:
-                self.text_features = self.text_features.to(self._device)
-                self.text_features /= self.text_features.norm(dim=-1, keepdim=True).to(self._device)
+                if self.new:
+                    self.text_features /= self.text_features.norm(dim=-1, keepdim=True).to(self._device)
+                    self.new = False
+
+            elif self.seperate:
+                if self.new:
+                    self.text_features = torch.cat([self.txtencode(c) for c in self.text_token]).to(self._device)
+                    self.text_features /= self.text_features.norm(dim=-1, keepdim=True).to(self._device)
+                    self.new = False
 
             else:
                 if self.new:
-                    self.text_features = self.txtencode(self.text_token.to(self._device))
-                    self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
+                    #self.text_token = self.text_token.to(self._device)
+                    
+                    self.text_features = self.txtencode(self.text_token)
+                    self.tm = self.text_features[:][1]
+                    self.text_features = self.text_features[:][0]
+                    
+                    self.text_features /= self.text_features.norm(dim=-1, keepdim=True).to(self._device)
                     self.new = False
 
-            tgt_list = []
-            for image_features in x:
-                image_features /= image_features.norm(dim=-1, keepdim=True)
-                #print(image_features.shape)
-                similarity = (100.0 * image_features @ self.text_features.T).softmax(dim=-1)
-                #print(similarity[0])
-                values, indices = similarity.topk(1)
+        tgt_list = []
+        for image_features in x:
+            image_features /= image_features.norm(dim=-1, keepdim=True)
+            #print(image_features.shape)
+            similarity = (100.0 * image_features @ self.text_features.T).softmax(dim=-1)
+            #print(similarity[0])
+            values, indices = similarity.topk(1)
 
-                #for value, index in zip(values, indices):
-                #print(indices)
-                tgt = self.label[indices]
-                #print("index:", indices, " clip pred:", tgt)
-                #tgt = self.tokenizer.encode(tgt, self._device)
+            #for value, index in zip(values, indices):
+            #print(indices)
+            tgt = self.label[indices]
+            #print("index:", indices, " clip pred:", tgt)
+            #tgt = self.tokenizer.encode(tgt, self._device)
 
-                #Leehakho
-                if self.padding:
-                    tgt = ""
+            #Leehakho
+            if self.padding:
+                tgt = ""
 
-                tgt_list.append(tgt)
-                #tgt_emb.append(txt_emb[indices])
-        else:
-            tgt_list = GT
+            tgt_list.append(tgt)
 
         tgt = self.tokenizer.encode(tgt_list, self._device)
         tgt = tgt[:, :-1]

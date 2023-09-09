@@ -6,7 +6,7 @@ model:
   max_label_length: 25
   charset_train: 0123456789abcdefghijklmnopqrstuvwxyz
   charset_test: 0123456789abcdefghijklmnopqrstuvwxyz
-  batch_size: 64
+  batch_size: 128
   weight_decay: 0.0
   warmup_pct: 0.075
   name: parclip

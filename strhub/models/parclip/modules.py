@@ -67,11 +67,11 @@ class DecoderLayer(nn.Module):
         # vs torch.Size([1, 1, 384]) torch.Size([1, 1, 384]) torch.Size([1, 5, 384])
         # tgt = tgt.unsqueeze(0)
         # memory = memory.unsqueeze(0)
-        sa_weights = 0
+        #sa_weights = 0
 
-        # tgt2, sa_weights = self.self_attn(tgt_norm, tgt_kv, tgt_kv, attn_mask=tgt_mask,
-        #                                   key_padding_mask=tgt_key_padding_mask)
-        # tgt = tgt + self.dropout1(tgt2)
+        tgt2, sa_weights = self.self_attn(tgt_norm, tgt_kv, tgt_kv, attn_mask=tgt_mask,
+                                        key_padding_mask=tgt_key_padding_mask)
+        tgt = tgt + self.dropout1(tgt2)
 
         #print(tgt_norm.shape, tgt_mask, tgt_key_padding_mask) #torch.Size([64, 26, 384]) None None
         tgt2, ca_weights = self.cross_attn(tgt_norm, memory, memory, attn_mask=tgt_mask, key_padding_mask=tgt_key_padding_mask)
