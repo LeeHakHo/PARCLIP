@@ -94,7 +94,7 @@ class PARCLIP(CrossEntropySystem):
         #Leehakho
         self.padding = False
         self.load_features = False
-        self.use_gt = True
+        self.use_gt = False
 
 
         if self.load_features:
@@ -125,19 +125,19 @@ class PARCLIP(CrossEntropySystem):
 
     def clip_encode(self, img: torch.Tensor):
         #print(img.shape)
-        img = F.interpolate(img, size=224)
+        #img = F.interpolate(img, size=224)
         #print(img.shape)
         #img = F.interpolate(img.unsqueeze(0), size=(3,224,224), mode='bilinear', align_corners=False)
         #print(self.CLIPpreprocess(img))
         with torch.no_grad():
             #emb = self.CLIPmodel.visual(img)
             #print(img.shape)
-            emb = self.CLIPmodel.visual(img.type(self.CLIPmodel.dtype))
+            emb = self.CLIPmodel.encode_image(img)
         return emb
         #return self.encoder(img)
 
-    def encode(self, img: torch.Tensor):
-        return self.encoder(img)
+    #def encode(self, img: torch.Tensor):
+    #    return self.encoder(img)
 
     def txtencode(self, text: torch.Tensor):
 
@@ -210,8 +210,8 @@ class PARCLIP(CrossEntropySystem):
         bs = images.shape[0]
         # +1 for <eos> at end of sequence.
         num_steps = max_length + 1
-        x, _ = self.clip_encode(images)
-        memory = self.encode(images)
+        x, memory = self.clip_encode(images)
+        #memory = self.encode(images)
 
         # Query positions up to `num_steps`
         pos_queries = self.pos_queries[:, :num_steps].expand(bs, -1, -1)
@@ -269,8 +269,8 @@ class PARCLIP(CrossEntropySystem):
         bs = images.shape[0]
         # +1 for <eos> at end of sequence.
         num_steps = max_length + 1
-        x, _ = self.clip_encode(images)
-        memory = self.encode(images)
+        x, memory = self.clip_encode(images)
+        #memory = self.encode(images)
 
         # Query positions up to `num_steps`
         pos_queries = self.pos_queries[:, :num_steps].expand(bs, -1, -1)

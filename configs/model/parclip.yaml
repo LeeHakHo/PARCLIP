@@ -5,11 +5,11 @@ _target_: strhub.models.parclip.system.PARCLIP
 patch_size: [ 4, 8 ]  # [ height, width ]
 
 # Architecture
-embed_dim: 384
-enc_num_heads: 6
+embed_dim: 512
+enc_num_heads: 8
 enc_mlp_ratio: 4
 enc_depth: 12
-dec_num_heads: 12
+dec_num_heads: 8
 dec_mlp_ratio: 4
 dec_depth: 1
 

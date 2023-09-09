@@ -226,7 +226,9 @@ class VisionTransformer(nn.Module):
     #     return {'pos_embed', 'cls_token', 'dist_token'}
 
     def forward(self, x: torch.Tensor):
+        #print(x.shape) #768,3,112,112
         x = self.conv1(x)  # shape = [*, width, grid, grid]
+        #print(x.shape) #768,768,7,7
         x = x.reshape(x.shape[0], x.shape[1], -1)  # shape = [*, width, grid ** 2]
         x = x.permute(0, 2, 1)  # shape = [*, grid ** 2, width]
         x = torch.cat([self.class_embedding.to(x.dtype) + torch.zeros(x.shape[0], 1, x.shape[-1], dtype=x.dtype, device=x.device), x], dim=1)  # shape = [*, grid ** 2 + 1, width]
@@ -240,6 +242,7 @@ class VisionTransformer(nn.Module):
         x = self.ln_post(x[:, 0, :])
         if self.proj is not None:
             x = x @ self.proj
+            nld = nld @ self.proj
         return x, nld
 
 
