@@ -69,7 +69,7 @@ class PARCLIP(CrossEntropySystem):
         #self.text_embed = TokenEmbedding(len(self.tokenizer), embed_dim)
 
         # +1 for <eos>
-        self.pos_queries = nn.Parameter(torch.Tensor(1, max_label_length + 1, embed_dim))
+        self.pos_queries = nn.Parameter(torch.Tensor(1, 77, embed_dim))
         self.dropout = nn.Dropout(p=dropout)
         # Encoder has its own init.
         named_apply(partial(init_weights, exclude=['encoder']), self)
@@ -94,7 +94,7 @@ class PARCLIP(CrossEntropySystem):
         self.padding = False
         self.load_features = False
         self.use_gt = False
-        self.seperate = True
+        self.seperate = False
 
         self.label = self.label_origin
         if self.load_features:
@@ -117,8 +117,8 @@ class PARCLIP(CrossEntropySystem):
                     tt =torch.cat([clip.tokenize(f"word {c}") for c in a]).to(self._device)
                     self.text_token.append(tt)
             else:
-                #self.label = random.sample(self.label_origin, 3000)
-                self.label = self.label_origin
+                self.label = random.sample(self.label_origin, 3000)
+                #self.label = self.label_origin
                 #print(self.label)
 
                 if self.padding:
@@ -221,26 +221,23 @@ class PARCLIP(CrossEntropySystem):
                 tf.append(self.tm[indices])
                 #tgt_emb.append(txt_emb[indices])
 
-        tf = torch.cat(tf, dim=0).to(self._device)
-        #tf = self.my_linear1(tf)
-        # tgt = self.tokenizer.encode(tgt_list, self._device)
-        # tgt = tgt[:, :-1]
+        tgt = torch.cat(tf, dim=0).to(self._device)
         #print(tgt.shape) #64,11
         #tgt = torch.stack(tgt_list)
         #tgt = tgt.squeeze(0)
         #B, N, L = tgt.shape
-        #N, L = tf.shape
-        
+        B, N, L = tgt.shape
         #print(L)
         # <bos> stands for the null context. We only supply position information for characters after <bos>.
 
-        #if tgt_query is None:
-        #    tgt_query = self.pos_queries[:, :L].expand(N, -1, -1)
-        #    #print(tgt_query.shape, L, N) #torch.Size([64, 10, 384]) 10 64
-        #print(memory.shape)
+        tgt_emb = self.pos_queries[:, :L - 1] + tgt
+
+        tgt_emb = self.dropout(tgt_emb)
+        if tgt_query is None:
+            tgt_query = self.pos_queries[:, :L].expand(N, -1, -1)
+            #print(tgt_query.shape, L, N) #torch.Size([64, 10, 384]) 10 64
         tgt_query = self.dropout(tgt_query)
-        #print(x.shape, memory.shape)
-        return self.decoder(tgt_query, tf, memory, tgt_query_mask, tgt_mask, tgt_padding_mask)
+        return self.decoder(tgt_query, tgt_emb, memory, tgt_query_mask, tgt_mask, tgt_padding_mask)
 
     def forward(self, images: Tensor, max_length: Optional[int] = None) -> Tensor:
         #print(images.shape, max_length)
