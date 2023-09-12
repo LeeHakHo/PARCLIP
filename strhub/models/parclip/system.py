@@ -59,24 +59,23 @@ class PARCLIP(CrossEntropySystem):
 
         # Perm/attn mask stuff
         self.rng = np.random.default_rng()
-        self.max_gen_perms = perm_num // 2 if perm_mirrored else perm_num
-        self.perm_forward = perm_forward
-        self.perm_mirrored = perm_mirrored
+        #self.max_gen_perms = perm_num // 2 if perm_mirrored else perm_num
+        #self.perm_forward = perm_forward
+        #self.perm_mirrored = perm_mirrored
         self.embed_dim = embed_dim
         # We don't predict <bos> nor <pad>
         self.head = nn.Linear(embed_dim, len(self.tokenizer) - 2)
         #print( len(self.tokenizer) - 2) #37
-        self.text_embed = TokenEmbedding(len(self.tokenizer), embed_dim)
+        #self.text_embed = TokenEmbedding(len(self.tokenizer), embed_dim)
 
         # +1 for <eos>
-        self.pos_queries = nn.Parameter(torch.Tensor(1, max_label_length + 1, embed_dim))
+        self.pos_queries = nn.Parameter(torch.Tensor(1, 77, embed_dim))
         self.dropout = nn.Dropout(p=dropout)
         # Encoder has its own init.
         named_apply(partial(init_weights, exclude=['encoder']), self)
         nn.init.trunc_normal_(self.pos_queries, std=.02)
 
         self.CLIPmodel, self.CLIPpreprocess = clip.load('ViT-B/16')
-
         # 모델 파라미터 고정하기
         for param in self.CLIPmodel.parameters():
             #param.requires_grad = False
@@ -85,8 +84,8 @@ class PARCLIP(CrossEntropySystem):
 
         self.charset_train = charset_train
 
-        self.encoder = Encoder(img_size, patch_size, embed_dim=embed_dim, depth=enc_depth, num_heads=enc_num_heads,
-                               mlp_ratio=enc_mlp_ratio)
+        # self.encoder = Encoder(img_size, patch_size, embed_dim=embed_dim, depth=enc_depth, num_heads=enc_num_heads,
+        #                        mlp_ratio=enc_mlp_ratio)
 
         dic = simple_tokenizer.SimpleTokenizer(max_label_length= self.max_label_length, charset = self.charset_train)
         self.label_origin = dic.getLabelVocab()
@@ -97,7 +96,11 @@ class PARCLIP(CrossEntropySystem):
         self.padding = False
         self.load_features = False
         self.use_gt = False
+<<<<<<< HEAD
         self.seperate = True
+=======
+        self.seperate = False
+>>>>>>> 56e84ebcfa635a7fc2275706933403943e8e13f2
 
         self.label = self.label_origin
         if self.load_features:
@@ -113,11 +116,20 @@ class PARCLIP(CrossEntropySystem):
             self.tm = self.text_features
         else:
             if self.seperate:
+<<<<<<< HEAD
                 self.text_token =[]
                 for l in self.label:
                     a = []
                     a.append(l)
                     self.text_token.append(torch.cat([clip.tokenize(f"word {c}") for c in a]).to(self._device))
+=======
+                self.text_token = []
+                for l in self.label:
+                    a = []
+                    a.append(l)
+                    tt =torch.cat([clip.tokenize(f"word {c}") for c in a]).to(self._device)
+                    self.text_token.append(tt)
+>>>>>>> 56e84ebcfa635a7fc2275706933403943e8e13f2
             else:
                 self.label = random.sample(self.label_origin, 3000)
                 #self.label = self.label_origin
@@ -127,20 +139,41 @@ class PARCLIP(CrossEntropySystem):
                     self.label = self.label_origin[:1]
                 
                 self.text_token = torch.cat([clip.tokenize(f"word {c}") for c in self.label])
+<<<<<<< HEAD
     #@torch.jit.ignore
     #def no_weight_decay(self):
     #    param_names = {'text_embed.embedding.weight', 'pos_queries'}
     #    enc_param_names = {'encoder.' + n for n in self.encoder.no_weight_decay()}
     #    return param_names.union(enc_param_names)
+=======
+                #print(self.text_token.shape)
+    
+        #self.my_linear1 = nn.Linear(512,self.embed_dim)
+        #self.my_linear2 = nn.Linear(512,self.embed_dim)
+    @torch.jit.ignore
+    def no_weight_decay(self):
+        param_names = {'text_embed.embedding.weight', 'pos_queries'}
+        #enc_param_names = {'encoder.' + n for n in self.encoder.no_weight_decay()}
+        return param_names#.union(enc_param_names)
+>>>>>>> 56e84ebcfa635a7fc2275706933403943e8e13f2
 
     def clip_encode(self, img: torch.Tensor):
         #print(img.shape)
         #img = F.interpolate(img, size=224)
         #print(img.shape)
         #img = F.interpolate(img.unsqueeze(0), size=(3,224,224), mode='bilinear', align_corners=False)
+<<<<<<< HEAD
         #print(self.CLIPpreprocess(img))
         #with torch.no_grad():
         emb = self.CLIPmodel.encode_image(img)
+=======
+        #print(img.shape) #torch.Size([768, 3, 32, 128])
+        with torch.no_grad():
+            #emb = self.CLIPmodel.visual(img)
+            #print(img[0][0].shape)
+            emb = self.CLIPmodel.encode_image(img)
+            #print(emb[:][0].shape, emb[:][1].shape) #512,768
+>>>>>>> 56e84ebcfa635a7fc2275706933403943e8e13f2
         return emb
         #return self.encoder(img)
 
@@ -149,15 +182,19 @@ class PARCLIP(CrossEntropySystem):
 
     def txtencode(self, text: torch.Tensor):
 
-        #print(self.CLIPpreprocess(img))
+        #print(text.shape)
         with torch.no_grad():
             emb = self.CLIPmodel.encode_text(text.to(self._device))
         return emb
     
-    def decode(self, tgt: torch.Tensor, x: torch.Tensor, memory: torch.Tensor, tgt_mask: Optional[Tensor] = None,
+    def decode(self, x: torch.Tensor, memory: torch.Tensor, tgt_mask: Optional[Tensor] = None,
                tgt_padding_mask: Optional[Tensor] = None, tgt_query: Optional[Tensor] = None,
-               tgt_query_mask: Optional[Tensor] = None, GT: Optional[Tensor] = None):
+               tgt_query_mask: Optional[Tensor] = None, max_len: Optional[int] = None, GT: Optional[Tensor] = None):
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 56e84ebcfa635a7fc2275706933403943e8e13f2
         if GT is not None:
             tgt_list = GT
         else:
@@ -168,7 +205,26 @@ class PARCLIP(CrossEntropySystem):
 
             elif self.seperate:
                 if self.new:
+<<<<<<< HEAD
                     self.text_features = torch.cat([self.txtencode(c) for c in self.text_token]).to(self._device)
+=======
+                    #self.text_features = torch.cat([self.txtencode(c) for c in self.text_token]).to(self._device)
+                    self.tm = []
+                    self.text_features =[]
+                    for c in self.text_token:
+                        temp = self.txtencode(c)
+                        self.tm.append(temp[1])
+                        self.text_features.append(temp[0])
+                        #print(self.tm[0].shape, self.text_features[0].shape)
+                    self.tm = torch.stack(self.tm)
+                    self.text_features = torch.stack(self.text_features)
+                    self.tm = self.tm.squeeze()
+                    self.text_features = self.text_features.squeeze()
+                    #print(self.tm.shape, self.text_features.shape)
+                    # self.text_features = torch.cat([self.txtencode(c)) for c in self.text_token])
+                    # self.tm = self.text_features[:][1]
+                    # self.text_features = self.text_features[:][0]
+>>>>>>> 56e84ebcfa635a7fc2275706933403943e8e13f2
                     self.text_features /= self.text_features.norm(dim=-1, keepdim=True).to(self._device)
                     self.new = False
 
@@ -183,6 +239,7 @@ class PARCLIP(CrossEntropySystem):
                     self.text_features /= self.text_features.norm(dim=-1, keepdim=True).to(self._device)
                     self.new = False
 
+<<<<<<< HEAD
         tgt_list = []
         for image_features in x:
             with torch.no_grad():
@@ -203,21 +260,37 @@ class PARCLIP(CrossEntropySystem):
                 tgt = ""
 
             tgt_list.append(tgt)
+=======
+            tgt_list = []
+            tf = []
+            for image_features in x:
+                image_features /= image_features.norm(dim=-1, keepdim=True)
+                #print(image_features.shape)
+                similarity = (100.0 * image_features.to(self._device) @ self.text_features.T.to(self._device)).softmax(dim=-1).to(self._device)
+                #print(similarity[0])
+                values, indices = similarity.topk(1)
 
-        tgt = self.tokenizer.encode(tgt_list, self._device)
-        tgt = tgt[:, :-1]
+                #for value, index in zip(values, indices):
+                #print(indices)
+                #print("index:", indices, " clip pred:", tgt)
+                #tgt = self.tokenizer.encode(tgt, self._device)
+
+                tf.append(self.tm[indices])
+                #tgt_emb.append(txt_emb[indices])
+>>>>>>> 56e84ebcfa635a7fc2275706933403943e8e13f2
+
+        tgt = torch.cat(tf, dim=0).to(self._device)
         #print(tgt.shape) #64,11
         #tgt = torch.stack(tgt_list)
         #tgt = tgt.squeeze(0)
         #B, N, L = tgt.shape
-        N, L = tgt.shape
+        B, N, L = tgt.shape
         #print(L)
         # <bos> stands for the null context. We only supply position information for characters after <bos>.
-        null_ctx = self.text_embed(tgt[:, :1])
 
-        tgt_emb = self.pos_queries[:, :L - 1] + self.text_embed(tgt[:, 1:])
+        tgt_emb = self.pos_queries[:, :L - 1] + tgt
 
-        tgt_emb = self.dropout(torch.cat([null_ctx, tgt_emb], dim=1))
+        tgt_emb = self.dropout(tgt_emb)
         if tgt_query is None:
             tgt_query = self.pos_queries[:, :L].expand(N, -1, -1)
             #print(tgt_query.shape, L, N) #torch.Size([64, 10, 384]) 10 64
@@ -229,8 +302,14 @@ class PARCLIP(CrossEntropySystem):
         max_length = self.max_label_length if max_length is None else min(max_length, self.max_label_length)
         bs = images.shape[0]
         # +1 for <eos> at end of sequence.
+
         num_steps = max_length + 1
         x, memory = self.clip_encode(images)
+<<<<<<< HEAD
+=======
+        #print(x.shape, memory.shape) #torch.Size([768, 512]) torch.Size([768, 197, 768])
+
+>>>>>>> 56e84ebcfa635a7fc2275706933403943e8e13f2
         #memory = self.encode(images)
 
         # Query positions up to `num_steps`
@@ -239,13 +318,15 @@ class PARCLIP(CrossEntropySystem):
         # Special case for the forward permutation. Faster than using `generate_attn_masks()`
         #tgt_mask = query_mask = torch.triu(torch.full((num_steps, num_steps), float('-inf'), device=self._device), 1)
 
-        # No prior context, so input is just <bos>. We query all positions.
-        tgt_in = torch.full((bs, 1), self.bos_id, dtype=torch.long, device=self._device)
-        tgt_out = self.decode(tgt_in, x, memory,tgt_query=pos_queries)
-        #print(tgt_out.shape) #torch.Size([64, 26, 384])
+        tgt_out = self.decode(x, memory,tgt_query=pos_queries, max_len = max_length)
+        #print(tgt_out.shape)  #torch.Size([32, 77, 512])
+        #print(tgt_out.shape)
+        # if max_length:
+        #     tgt_out = tgt_out[:, :max_length +1, :]
         logits = self.head(tgt_out)
         #print(logits.shape, "!!!!") #1, 6, 37 same
         #loss = F.cross_entropy(logits, logits, ignore_index=self.pad_id)
+
         return logits
 
     def write_unique_strings_to_file(self, strings):
@@ -290,6 +371,11 @@ class PARCLIP(CrossEntropySystem):
         # +1 for <eos> at end of sequence.
         num_steps = max_length + 1
         x, memory = self.clip_encode(images)
+<<<<<<< HEAD
+=======
+        #memory = self.my_linear2(memory)
+        
+>>>>>>> 56e84ebcfa635a7fc2275706933403943e8e13f2
         #memory = self.encode(images)
 
         # Query positions up to `num_steps`
@@ -298,13 +384,13 @@ class PARCLIP(CrossEntropySystem):
         # Special case for the forward permutation. Faster than using `generate_attn_masks()`
         #tgt_mask = query_mask = torch.triu(torch.full((num_steps, num_steps), float('-inf'), device=self._device), 1)
 
-        # No prior context, so input is just <bos>. We query all positions.
-        tgt_in = torch.full((bs, 1), self.bos_id, dtype=torch.long, device=self._device)
         if self.use_gt:
-            tgt_out = self.decode(tgt_in, x, memory, tgt_query=pos_queries, GT=labels)
+            tgt_out = self.decode(x, memory, tgt_query=pos_queries, GT=labels)
         else:
-            tgt_out = self.decode(tgt_in, x, memory, tgt_query=pos_queries)
+            tgt_out = self.decode(x, memory, tgt_query=pos_queries)
         #print(tgt_out.shape) #torch.Size([64, 26, 384])
+        # if max_length:
+        #     tgt_out = tgt_out[:, :max_length +1, :]
         logits = self.head(tgt_out)
         #print(logits.shape, "!!!!") #1, 6, 37 same
         #loss = F.cross_entropy(logits, logits, ignore_index=self.pad_id)

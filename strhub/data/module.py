@@ -21,8 +21,9 @@ from torch.utils.data import DataLoader
 from torchvision import transforms as T
 
 from .dataset import build_tree_dataset, LmdbDataset
+from CLIP import clip
 
-
+useCLIP = True
 class SceneTextDataModule(pl.LightningDataModule):
     TEST_BENCHMARK_SUB = ('IIIT5k', 'SVT', 'IC13_857', 'IC15_1811', 'SVTP', 'CUTE80')
     TEST_BENCHMARK = ('IIIT5k', 'SVT', 'IC13_1015', 'IC15_2077', 'SVTP', 'CUTE80')
@@ -62,9 +63,22 @@ class SceneTextDataModule(pl.LightningDataModule):
         self.collate_fn = collate_fn
         self._train_dataset = None
         self._val_dataset = None
+        if useCLIP:
+            _, CLIPpreprocess = clip.load('ViT-B/16')
+            #print(type(CLIPpreprocess))
+            self.CLIPpreprocess  = CLIPpreprocess
 
     @staticmethod
-    def get_transform(img_size: Tuple[int], augment: bool = False, rotation: int = 0):
+    def get_transform(img_size: Tuple[int], CLIPpreprocess: T.transforms.Compose = None, augment: bool = False, rotation: int = 0):
+        if useCLIP:
+            if augment:
+                from .augment import rand_augment_transform
+                CLIPpreprocess.transforms.insert(0, rand_augment_transform())
+            if rotation:
+                CLIPpreprocess.transforms.insert(0,(lambda img: img.rotate(rotation, expand= True)))
+
+
+            return CLIPpreprocess
         transforms = []
         if augment:
             from .augment import rand_augment_transform
@@ -81,7 +95,7 @@ class SceneTextDataModule(pl.LightningDataModule):
     @property
     def train_dataset(self):
         if self._train_dataset is None:
-            transform = self.get_transform(self.img_size, self.augment)
+            transform = self.get_transform(self.img_size, self.CLIPpreprocess, self.augment )
             root = PurePath(self.root_dir, 'train', self.train_dir)
 
             self._train_dataset = build_tree_dataset(root, self.charset_train, self.max_label_length,
@@ -92,7 +106,7 @@ class SceneTextDataModule(pl.LightningDataModule):
     @property
     def val_dataset(self):
         if self._val_dataset is None:
-            transform = self.get_transform(self.img_size)
+            transform = self.get_transform(self.img_size, self.CLIPpreprocess )
             #Leehakho
             root=PurePath(self.root_dir, 'test', self.train_dir)
 

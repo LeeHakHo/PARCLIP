@@ -46,6 +46,9 @@ class DecoderLayer(nn.Module):
         self.dropout2 = nn.Dropout(dropout)
         self.dropout3 = nn.Dropout(dropout)
 
+        #self.my_linear1 = nn.Linear(512,d_model)
+        #self.my_linear2 = nn.Linear(768,d_model)
+
         self.activation = transformer._get_activation_fn(activation)
 
     def __setstate__(self, state):
@@ -69,12 +72,17 @@ class DecoderLayer(nn.Module):
         # memory = memory.unsqueeze(0)
         #sa_weights = 0
 
+<<<<<<< HEAD
         #tgt2, sa_weights = self.self_attn(tgt_norm, tgt_kv, tgt_kv, attn_mask=tgt_mask,
         #                                key_padding_mask=tgt_key_padding_mask)
         #tgt = tgt + self.dropout1(tgt2)
+=======
+        # tgt2, sa_weights = self.self_attn(tgt_norm, tgt_kv, tgt_kv, attn_mask=tgt_mask,
+        #                                    key_padding_mask=tgt_key_padding_mask)
+        # tgt = tgt + self.dropout1(tgt2)
+>>>>>>> 56e84ebcfa635a7fc2275706933403943e8e13f2
 
-        #print(tgt_norm.shape, tgt_mask, tgt_key_padding_mask) #torch.Size([64, 26, 384]) None None
-        tgt2, ca_weights = self.cross_attn(tgt_norm, memory, memory, attn_mask=tgt_mask, key_padding_mask=tgt_key_padding_mask)
+        tgt2, ca_weights = self.cross_attn(self.norm1(tgt), memory, memory)#, attn_mask=tgt_mask, key_padding_mask=tgt_key_padding_mask)
         tgt = tgt + self.dropout2(tgt2)
         #print(tgt.shape)  # vs  torch.Size([1, 4, 384])
         tgt2 = self.linear2(self.dropout(self.activation(self.linear1(self.norm2(tgt)))))
@@ -85,12 +93,18 @@ class DecoderLayer(nn.Module):
     def forward(self, query, content, memory, query_mask: Optional[Tensor] = None, content_mask: Optional[Tensor] = None,
                 content_key_padding_mask: Optional[Tensor] = None, update_content: bool = True):
         query_norm = self.norm_q(query)
+        #content = self.my_linear1(content)
+        #memory = self.my_linear2(memory)
         content_norm = self.norm_c(content)
-        #print(query.shape, query_norm.shape, self.norm1(query).shape) #torch.Size([64, 26, 384]) torch.Size([64, 26, 384]) torch.Size([64, 26, 384])
+        #print(content.shape, content_norm.shape, query_norm.shape, memory.shape) #torch.Size([16, 512]) torch.Size([16, 512]) torch.Size([16, 11, 512]), torch.Size([16, 197, 768])
+
+        
         query = self.forward_stream(query, query_norm, content_norm, memory, query_mask, content_key_padding_mask)[0]
         if update_content:
-            content = self.forward_stream(content, content_norm, content_norm, memory, content_mask,
-                                          content_key_padding_mask)[0]
+           content = self.forward_stream(content, content_norm, content_norm, memory, content_mask,
+                                         content_key_padding_mask)[0]
+        # content = self.forward_stream(content, content_norm, content_norm, memory, content_mask,
+        #                                   content_key_padding_mask)[0]
         return query, content
 
 

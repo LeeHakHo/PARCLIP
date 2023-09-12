@@ -54,9 +54,9 @@ class only_clip():
         self.label_origin = dic.getLabelVocab()
         self.new = True
         
-        self.load_features = True
+        self.load_features = False
         self.save = False
-
+        self.padding = False
         if self.load_features:
             self.new = False
             # 파일에서 텐서를 불러오기
@@ -72,12 +72,22 @@ class only_clip():
             self.label = self.label_origin
 
         else:
-            if padding:
+            if self.padding:
                 self.label = self.label_origin[:1]
                 
             self.label = self.label_origin
             print(len(self.label))
-            self.text_token = torch.cat([clip.tokenize(f"word {c}") for c in self.label]).to(self._device)
+            
+
+
+            self.text_token = []
+            for l in self.label:
+                a = []
+                a.append(l)
+                self.text_token.append(torch.cat([clip.tokenize(f"word {c}") for c in a]).to(self._device))
+            #self.text_token = torch.cat([clip.tokenize(f"word {c}") for c in self.label]).to(self._device)
+
+
 
         if self.save:
             s = 0
@@ -89,7 +99,11 @@ class only_clip():
             self.text_token_new = self.text_token[s:e]   
             self.text_features = self.txtencode(self.text_token_new.to(self._device))
             torch.save(self.text_features, "text_features_sum_" + str(e) + ".pth")
+            
+        self.text_features = torch.cat([self.txtencode(c) for c in self.text_token]).to(self._device)
+        self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
 
+        
     def clip_encode(self, img: torch.Tensor):
         #print(img.shape)
         img = F.interpolate(img, size=224)
@@ -114,12 +128,13 @@ class only_clip():
                tgt_padding_mask: Optional[Tensor] = None, tgt_query: Optional[Tensor] = None,
                tgt_query_mask: Optional[Tensor] = None):
 
-        if self.new:
-            self.text_features = self.txtencode(self.text_token.to(self._device))
-            self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
-            self.new = False
-        else:
-            self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
+        # if self.new:
+        #     self.text_features = self.txtencode(self.text_token.to(self._device))
+        #     self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
+        #     self.new = False
+        # else:
+        #     self.text_features /= self.text_features.norm(dim=-1, keepdim=True)
+
         #print(text_features.shape)
         tgt_list = []
         for image_features in x:

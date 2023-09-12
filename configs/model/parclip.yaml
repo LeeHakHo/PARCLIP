@@ -14,8 +14,13 @@ dec_mlp_ratio: 4
 dec_depth: 1
 
 # Training
+<<<<<<< HEAD
 lr: 7e-5
 perm_num: 6
+=======
+lr: 7e-4
+perm_num: 1
+>>>>>>> 56e84ebcfa635a7fc2275706933403943e8e13f2
 perm_forward: false
 perm_mirrored: false
 dropout: 0.1
