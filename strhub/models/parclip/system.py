@@ -78,8 +78,10 @@ class PARCLIP(CrossEntropySystem):
         self.CLIPmodel, self.CLIPpreprocess = clip.load('ViT-B/16')
 
         # 모델 파라미터 고정하기
-       # for param in self.CLIPmodel.parameters():
-       #     param.requires_grad = False
+        for param in self.CLIPmodel.parameters():
+            #param.requires_grad = False
+            if param.dtype == torch.float16:
+                param.data = param.data.to(torch.float32)
 
         self.charset_train = charset_train
 
@@ -142,8 +144,8 @@ class PARCLIP(CrossEntropySystem):
         return emb
         #return self.encoder(img)
 
-    #@def encode(self, img: torch.Tensor):
-    #   return self.encoder(img)
+    #def encode(self, img: torch.Tensor):
+    #    return self.encoder(img)
 
     def txtencode(self, text: torch.Tensor):
 
@@ -183,9 +185,10 @@ class PARCLIP(CrossEntropySystem):
 
         tgt_list = []
         for image_features in x:
-            image_features /= image_features.norm(dim=-1, keepdim=True)
+            with torch.no_grad():
+                image_features /= image_features.norm(dim=-1, keepdim=True)
             #print(image_features.shape)
-            similarity = (100.0 * image_features @ self.text_features.T).softmax(dim=-1)
+                similarity = (100.0 * image_features @ self.text_features.T).softmax(dim=-1)
             #print(similarity[0])
             values, indices = similarity.topk(1)
 
