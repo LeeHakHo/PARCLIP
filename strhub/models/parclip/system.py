@@ -113,6 +113,7 @@ class PARCLIP(CrossEntropySystem):
             self.tm = self.text_features
         else:
             if self.seperate:
+                print(len(self.label))
                 self.text_token =[]
                 for l in self.label:
                     a = []
@@ -134,11 +135,7 @@ class PARCLIP(CrossEntropySystem):
     #    return param_names.union(enc_param_names)
 
     def clip_encode(self, img: torch.Tensor):
-        #print(img.shape)
         #img = F.interpolate(img, size=224)
-        #print(img.shape)
-        #img = F.interpolate(img.unsqueeze(0), size=(3,224,224), mode='bilinear', align_corners=False)
-        #print(self.CLIPpreprocess(img))
         #with torch.no_grad():
         emb = self.CLIPmodel.encode_image(img)
         return emb
@@ -174,8 +171,6 @@ class PARCLIP(CrossEntropySystem):
 
             else:
                 if self.new:
-                    #self.text_token = self.text_token.to(self._device)
-                    
                     self.text_features = self.txtencode(self.text_token)
                     self.tm = self.text_features[:][1]
                     self.text_features = self.text_features[:][0]
@@ -187,15 +182,10 @@ class PARCLIP(CrossEntropySystem):
         for image_features in x:
             with torch.no_grad():
                 image_features /= image_features.norm(dim=-1, keepdim=True)
-            #print(image_features.shape)
                 similarity = (100.0 * image_features @ self.text_features.T).softmax(dim=-1)
-            #print(similarity[0])
+            
             values, indices = similarity.topk(1)
-
-            #for value, index in zip(values, indices):
-            #print(indices)
             tgt = self.label[indices]
-            #print("index:", indices, " clip pred:", tgt)
             #tgt = self.tokenizer.encode(tgt, self._device)
 
             #Leehakho
@@ -206,12 +196,11 @@ class PARCLIP(CrossEntropySystem):
 
         tgt = self.tokenizer.encode(tgt_list, self._device)
         tgt = tgt[:, :-1]
-        #print(tgt.shape) #64,11
         #tgt = torch.stack(tgt_list)
-        #tgt = tgt.squeeze(0)
+
         #B, N, L = tgt.shape
         N, L = tgt.shape
-        #print(L)
+
         # <bos> stands for the null context. We only supply position information for characters after <bos>.
         null_ctx = self.text_embed(tgt[:, :1])
 
@@ -220,7 +209,6 @@ class PARCLIP(CrossEntropySystem):
         tgt_emb = self.dropout(torch.cat([null_ctx, tgt_emb], dim=1))
         if tgt_query is None:
             tgt_query = self.pos_queries[:, :L].expand(N, -1, -1)
-            #print(tgt_query.shape, L, N) #torch.Size([64, 10, 384]) 10 64
         tgt_query = self.dropout(tgt_query)
         return self.decoder(tgt_query, tgt_emb, memory, tgt_query_mask, tgt_mask, tgt_padding_mask)
 
@@ -267,7 +255,7 @@ class PARCLIP(CrossEntropySystem):
         images, labels = batch
 
         #GT 개수 뽑아보기
-        #self.write_unique_strings_to_file(labels)
+        self.write_unique_strings_to_file(labels)
 
         tgt = self.tokenizer.encode(labels, self._device)
         gt = tgt[:, 1:]

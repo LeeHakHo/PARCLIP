@@ -93,10 +93,7 @@ class SceneTextDataModule(pl.LightningDataModule):
     def val_dataset(self):
         if self._val_dataset is None:
             transform = self.get_transform(self.img_size)
-            #Leehakho
-            root=PurePath(self.root_dir, 'test', self.train_dir)
-
-            #root = PurePath(self.root_dir, 'test')
+            root = PurePath(self.root_dir, 'val')
             self._val_dataset = build_tree_dataset(root, self.charset_test, self.max_label_length,
                                                    self.min_image_dim, self.remove_whitespace, self.normalize_unicode,
                                                    transform=transform)

@@ -13,7 +13,7 @@ model:
 
   # For charset_test, ordering doesn't matter.
   charset_test: "0123456789abcdefghijklmnopqrstuvwxyz"
-  batch_size: 384
+  batch_size: 798
   weight_decay: 0.0
   warmup_pct: 0.075  # equivalent to 1.5 epochs of warm up
 
@@ -36,7 +36,7 @@ trainer:
   _convert_: all
   val_check_interval: 2000
   #max_steps: 169680  # 20 epochs x 8484 steps (for batch size = 384, real data)
-  max_epochs: 300
+  max_epochs: 20
   gradient_clip_val: 20
   accelerator: gpu
   devices: 8 #2-> 4

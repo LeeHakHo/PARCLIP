@@ -31,7 +31,7 @@ model:
 data:
   _target_: strhub.data.module.SceneTextDataModule
   root_dir: data
-  train_dir: eng/
+  train_dir: real
   batch_size: ${model.batch_size}
   img_size: ${model.img_size}
   charset_train: ${model.charset_train}

@@ -115,12 +115,12 @@ hydra:
     - hydra.mode=RUN
     task:
     - +experiment=parclip
-    - dataset=eng
+    - dataset=real
     - charset=36_lowercase
   job:
     name: train_ddp_process_7
     chdir: null
-    override_dirname: +experiment=parclip,charset=36_lowercase,dataset=eng
+    override_dirname: +experiment=parclip,charset=36_lowercase,dataset=real
     id: ???
     num: ???
     config_name: main
@@ -148,7 +148,7 @@ hydra:
     output_dir: /home/ohh/PycharmProject/PARCLIP
     choices:
       experiment: parclip
-      dataset: eng
+      dataset: real
       charset: 36_lowercase
       model: parclip
       hydra/env: default
